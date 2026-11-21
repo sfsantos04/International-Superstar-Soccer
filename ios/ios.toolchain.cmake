@@ -18,5 +18,4 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
-set(CMAKE_C_FLAGS_INIT "-fembed-bitcode-marker")
-set(CMAKE_CXX_FLAGS_INIT "-fembed-bitcode-marker")
+# bitcode is dead on Xcode 14+; -fembed-bitcode-marker breaks the build there.

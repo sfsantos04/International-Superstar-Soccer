@@ -49,9 +49,17 @@ jobs:
       - name: Log da falha
         if: failure()
         run: |
-          { echo "=== ultimas 300 linhas ==="; tail -300 build-ios.log 2>/dev/null; \
-            echo "=== arquivos em build-ios ==="; ls -la build-ios 2>/dev/null; } \
-            > log-${{ github.run_number }}.txt || echo "sem log" > log-${{ github.run_number }}.txt
+          F=log-${{ github.run_number }}.txt
+          : > "$F"
+          echo "=== build-ios.log (ultimas 300) ===" >> "$F"
+          tail -300 build-ios.log >> "$F" 2>&1 || true
+          echo "=== arvore ===" >> "$F"
+          ls -la >> "$F" 2>&1 || true
+          echo "=== build-ios ===" >> "$F"
+          ls -la build-ios >> "$F" 2>&1 || true
+          echo "=== sdl2-ios ===" >> "$F"
+          ls -la sdl2-ios/lib >> "$F" 2>&1 || true
+          wc -c "$F"
 
       - name: Publicar log da falha
         if: failure()
