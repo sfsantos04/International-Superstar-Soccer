@@ -3016,6 +3016,22 @@ int main(int argc, char **argv) {
                 if (_rf_sec > 0.05) {
                     fprintf(stderr, "[SlowFrame %u] took %.3fs\n", frame_count, _rf_sec);
                 }
+                {
+                    /* Aggregate cost per frame so a device log answers "is it
+                     * 60 fps?" without a profiler attached. */
+                    static double perf_sum, perf_worst;
+                    static unsigned perf_n;
+                    perf_sum += _rf_sec;
+                    if (_rf_sec > perf_worst) perf_worst = _rf_sec;
+                    if (++perf_n >= 300) {
+                        const double avg = perf_sum / (double)perf_n;
+                        fprintf(stderr,
+                            "[Perf] %u frames: media %.2f ms (%.1f fps), pior %.2f ms\n",
+                            perf_n, avg * 1000.0, avg > 0.0 ? 1.0 / avg : 0.0,
+                            perf_worst * 1000.0);
+                        perf_sum = 0.0; perf_worst = 0.0; perf_n = 0;
+                    }
+                }
 
                 if (g_dump_state_path && (g_cpu.S != 0x1af || cpu_read16(&g_cpu, 0, 0x3c))) {
                     static unsigned reports;

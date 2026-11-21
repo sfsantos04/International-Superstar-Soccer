@@ -85,9 +85,34 @@ int SDL_main(int argc, char **argv)
         setenv("TMPDIR", [[docs stringByAppendingPathComponent:@"tmp"]
                           fileSystemRepresentation], 1);
 
-        /* Relative asset lookups (mods/, recomp/) resolve from the cwd. */
-        if (chdir([[[NSBundle mainBundle] bundlePath] fileSystemRepresentation]) != 0)
-            lg("chdir(bundle) falhou: %s\n", strerror(errno));
+        /* The bundle is read-only, so a config saved from the pause menu would
+         * be silently dropped. Mirror the assets into Documents and run from
+         * there: settings, HD packs and saves then persist between launches. */
+        NSString *bundle = [[NSBundle mainBundle] bundlePath];
+        NSFileManager *fmw = [NSFileManager defaultManager];
+
+        NSString *recomp = [docs stringByAppendingPathComponent:@"recomp"];
+        [fmw createDirectoryAtPath:recomp withIntermediateDirectories:YES
+                        attributes:nil error:nil];
+        NSString *denySrc = [bundle stringByAppendingPathComponent:@"aot_boot_deny.txt"];
+        NSString *denyDst = [recomp stringByAppendingPathComponent:@"aot_boot_deny.txt"];
+        if (![fmw fileExistsAtPath:denyDst] && [fmw fileExistsAtPath:denySrc])
+            [fmw copyItemAtPath:denySrc toPath:denyDst error:nil];
+
+        NSString *cfgSrc = [bundle stringByAppendingPathComponent:@"issd_config.json"];
+        NSString *cfgDst = [docs stringByAppendingPathComponent:@"issd_config.json"];
+        if (![fmw fileExistsAtPath:cfgDst] && [fmw fileExistsAtPath:cfgSrc])
+            [fmw copyItemAtPath:cfgSrc toPath:cfgDst error:nil];
+
+        NSString *modsDst = [docs stringByAppendingPathComponent:@"mods"];
+        NSString *modsSrc = [bundle stringByAppendingPathComponent:@"mods"];
+        if (![fmw fileExistsAtPath:modsDst] && [fmw fileExistsAtPath:modsSrc])
+            [fmw createSymbolicLinkAtPath:modsDst withDestinationPath:modsSrc error:nil];
+
+        if (chdir([docs fileSystemRepresentation]) != 0)
+            lg("chdir(Documents) falhou: %s\n", strerror(errno));
+        lg("cwd gravavel: %s\n", [[[NSFileManager defaultManager]
+              currentDirectoryPath] UTF8String]);
 
         NSFileManager *fm = [NSFileManager defaultManager];
         NSArray *files = [fm contentsOfDirectoryAtPath:docs error:nil];
