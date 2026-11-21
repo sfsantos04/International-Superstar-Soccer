@@ -1,4 +1,6 @@
 name: ios
+permissions:
+  contents: write
 on:
   push:
     branches: [main]
@@ -20,6 +22,7 @@ jobs:
 
       - name: Build + empacotar
         run: |
+          set -o pipefail
           chmod +x ios/build_ios.sh
           ./ios/build_ios.sh "$PWD" 2>&1 | tee build-ios.log
 
@@ -46,8 +49,9 @@ jobs:
       - name: Log da falha
         if: failure()
         run: |
-          cp build-ios.log /tmp/build-ios.log 2>/dev/null || true
-          tail -200 /tmp/build-ios.log > log-${{ github.run_number }}.txt 2>/dev/null || echo "sem log" > log-${{ github.run_number }}.txt
+          { echo "=== ultimas 300 linhas ==="; tail -300 build-ios.log 2>/dev/null; \
+            echo "=== arquivos em build-ios ==="; ls -la build-ios 2>/dev/null; } \
+            > log-${{ github.run_number }}.txt || echo "sem log" > log-${{ github.run_number }}.txt
 
       - name: Publicar log da falha
         if: failure()
