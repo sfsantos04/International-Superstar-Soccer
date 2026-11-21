@@ -1,0 +1,65 @@
+#pragma once
+#include <stdbool.h>
+#include <stddef.h>
+
+/* Android storage glue. Every function is a no-op stub off Android, so callers
+ * need no conditionals of their own. */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifdef ISSD_ANDROID
+
+/* App-private external storage: where config lives and where a user drops
+ * their ROM over USB. Empty until ISSDActivity has handed it over. */
+const char *issd_android_external_dir(void);
+
+/* App-private internal storage, used for saves. */
+const char *issd_android_internal_dir(void);
+
+/* App-private external storage /mods directory. */
+const char *issd_android_mods_dir(void);
+
+/* Find a .sfc/.smc in the external directory. Android offers no file picker
+ * reachable from C, so discovery replaces the desktop chooser. */
+bool issd_android_find_rom(char *out, size_t out_size);
+
+/* Open Android's document picker from the native overlay. The Java side
+ * imports the result into app storage and restarts SDL when needed. */
+void issd_android_pick_rom(void);
+void issd_android_pick_mods_folder(void);
+bool issd_android_is_picker_cancelled(void);
+unsigned issd_android_rom_generation(void);
+bool issd_android_is_finishing(void);
+void issd_android_set_game_running(bool running);
+/* Unconsumed overlay-safe edges, in SDL window-coordinate pixels. Renderer
+ * output pixels may differ: scale each axis by output_size/window_size. */
+void issd_android_safe_insets(int *left, int *top, int *right, int *bottom);
+
+#else
+
+static inline const char *issd_android_external_dir(void) { return ""; }
+static inline const char *issd_android_internal_dir(void) { return ""; }
+static inline const char *issd_android_mods_dir(void) { return "mods"; }
+static inline bool issd_android_find_rom(char *out, size_t out_size) {
+    (void)out; (void)out_size; return false;
+}
+static inline void issd_android_pick_rom(void) {}
+static inline void issd_android_pick_mods_folder(void) {}
+static inline bool issd_android_is_picker_cancelled(void) { return false; }
+static inline unsigned issd_android_rom_generation(void) { return 0; }
+static inline bool issd_android_is_finishing(void) { return false; }
+static inline void issd_android_set_game_running(bool running) { (void)running; }
+static inline void issd_android_safe_insets(int *left, int *top, int *right, int *bottom) {
+    if (left) *left = 0;
+    if (top) *top = 0;
+    if (right) *right = 0;
+    if (bottom) *bottom = 0;
+}
+
+#endif
+
+#ifdef __cplusplus
+}
+#endif

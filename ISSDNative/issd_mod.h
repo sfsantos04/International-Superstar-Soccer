@@ -1,0 +1,358 @@
+#ifndef ISSD_MOD_H
+#define ISSD_MOD_H
+
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include "issd_stadium.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* The cartridge stores 20 squad slots per team. This was 16, which quietly
+ * left the last four players of every team unpatched. */
+#define ISSD_MAX_PLAYERS_PER_TEAM 20
+/* The select screen offers 42 teams once the seventh group is unlocked, but
+ * only 36 of them are squads. The last six - ALL STAR, EUROSTAR A and B,
+ * ASIAN STAR, AFRICAN STAR and ALL AMERICAN STAR - are assembled at kick-off
+ * from the group they belong to: team 36+g takes twenty players out of the
+ * six rosters of group g. That was measured, not guessed - a match as ALL
+ * AMERICAN STAR reads twenty eight-byte names scattered across teams 30 to
+ * 35 and none from a roster of its own, and the roster pointer table's last
+ * seven entries all point at the same dead address.
+ *
+ * So a pack can unlock them, and can give them attributes and a kit, but it
+ * cannot name their players: rename the group's teams and the all-stars
+ * follow. Only 0-35 are real squads. */
+#define ISSD_ROM_TEAMS            42
+#define ISSD_ROM_STOCK_TEAMS      36
+#define ISSD_MAX_TEAMS_PER_PACK   42
+#define ISSD_MAX_MOD_PACKS        16
+
+typedef struct {
+    uint8_t acceleration;  /* 0 - 99, quantised to the cartridge 1-16 */
+    uint8_t speed;         /* 0 - 99, quantised to the cartridge 1-16 */
+    uint8_t shooting;      /* 0 - 99, quantised to the cartridge 1-16 */
+    uint8_t technique;     /* 0 - 99, quantised to the cartridge 1-16 */
+    uint8_t balance;       /* 0 - 99, quantised to the cartridge 1-16 */
+    uint8_t intelligence;  /* 0 - 99, quantised to the cartridge 1-16 */
+    uint8_t dribbling;     /* 0 - 99, quantised to the cartridge 1-16 */
+    uint8_t jumping;       /* 0 - 99, quantised to the cartridge 1-16 */
+    uint8_t stamina;       /* 0 - 99, quantised to the cartridge 1-16 */
+    uint8_t goalkeeping;   /* 0 - 99, quantised to the cartridge 1-16 */
+} IssdPlayerAttributes;
+
+typedef struct {
+    char     name[24];
+    uint8_t  shirt_number;
+    char     position[4];  /* "GK", "DF", "MF", "FW" */
+    /* One byte in the cartridge. The top half selects which of the team's
+     * two skin tones the player wears: 0 is tone 0, the skin and hair in
+     * the kit record; 1 is tone 1, the team's alternate, reached through
+     * the per-team pointer tables DATA_82837C and DATA_8283D2 (see the
+     * team's skin_rgb and hair_rgb). 2 and 3 select the goalkeeper's and
+     * referee's palettes, and draw the player in those colours. The bottom
+     * half is the hair actor variant, 0 to 13 - the cartridge's own squads
+     * use 0 to 13, its keepers 0. Both keep their names so packs already
+     * written still load. */
+    uint8_t  skin_tone;    /* top half: tone 0, tone 1, keeper, referee */
+    uint8_t  hair_style;   /* bottom half: hair actor variant, 0 to 13 */
+    IssdPlayerAttributes attributes;
+} IssdModPlayer;
+
+typedef struct {
+    uint8_t  team_id;
+    /* True when this is a team to be added rather than one to replace.
+     * The six cells of the seventh group are real slots the cartridge
+     * already has - they are only unusable because the squad loader
+     * assembles their players from their group instead of reading a
+     * roster. A pack that says so gets the next of them, with a roster
+     * of its own written into free cartridge space.
+     *
+     * `team_id` is ignored for these; `assigned_slot` is where it landed,
+     * and is what the plate, the photograph and the strip are keyed on. */
+    bool     new_team;
+    int      assigned_slot;          /* -1 until the pack is applied */
+    char     name[32];
+    char     short_name[4];
+    char     country_code[4];
+    /* A formation name from the library in issd_formation.h - "4-4-2",
+     * "4-2-3-1", "3-4-2-1" and so on. Empty leaves the team's own shape
+     * alone. `tactics` is "attacking", "balanced" or "defensive" and shifts
+     * that shape without changing how many players are in each line. */
+    char     formation[24];
+    char     tactics[16];
+    /* What the select screen's plate should read. The plate is a
+     * pre-rendered graphic, so the host draws over it - the same way it
+     * does for stadiums. Empty leaves the cartridge's own. */
+    char     plate_name[20];
+    /* The squad photograph the select screen shows. The cartridge's own is
+     * a compressed graphic per team, so this is drawn by the host instead:
+     * a 32-bit BMP beside the pack file, any size, scaled into the 96x72
+     * the frame leaves. Empty keeps the cartridge's photograph. */
+    char     photo[64];
+    /* The team flag graphic. A 32-bit BMP beside the pack file, drawn over
+     * the select screen and in-game HUD. Empty keeps the cartridge's flag. */
+    char     flag[64];
+    /* Kit colours. The cartridge keeps a seventeen-colour palette per kit:
+     * three shirt shades, three shorts shades, two sock shades, and skin and
+     * hair it shares with everyone. A pack gives the base colour of a part
+     * and the shades are derived from it, the way the cartridge shades its
+     * own. 0 leaves that part alone.
+     *
+     * Which palette a team wears is not written down anywhere a search can
+     * find it. It was measured instead, one match per team, by recording
+     * every cartridge offset a run touched; kKitRecord in issd_mod_rom.c is
+     * what that measured. `kit_record` overrides it for a cartridge or a
+     * team the table does not cover. */
+    uint32_t shirt_rgb;
+    uint32_t shorts_rgb;
+    uint32_t socks_rgb;
+    int      kit_record;      /* -1: use the measured table */
+    bool     stripes;         /* true: enable vertical shirt stripes on pitch */
+    /* Skin and hair for the two tones the cartridge offers a team. Its kit
+     * record keeps one tone as colour 1 (hair) and colours 2-6 (a five-step
+     * skin ramp); the other is reached through the per-team pointer tables
+     * DATA_82837C (skin) and DATA_8283D2 (hair), which a player's skin_tone
+     * nibble selects. A pack gives the base colour of a part and the ramp
+     * is derived from it later; 0 leaves that part alone. Stored the way
+     * json_colour keeps the kit colours, with bit 31 set so black is not
+     * mistaken for "not given". */
+    uint32_t skin_rgb[2];
+    uint32_t hair_rgb[2];
+    int      player_count;
+    IssdModPlayer players[ISSD_MAX_PLAYERS_PER_TEAM];
+} IssdModTeam;
+
+/* The cartridge ships eight match layouts. Logical stadium slots can extend
+ * their select-screen name and displayed pitch dimensions by moving tables
+ * into free space (see issd_mod_rom.c). Added slots reuse stock match geometry
+ * through slot & 7; these dimensions do not create a new playable layout.
+ * The table ceiling is 1187 bytes in $82 at five per slot and 1336 in $87 at
+ * seven. Thirty-two stays well within both banks. */
+#define ISSD_MAX_STADIUMS 32
+#define ISSD_STOCK_STADIUMS 8
+
+typedef struct {
+    int8_t  stadium_id;      /* 0..31 logical slot, or -1 for no entry */
+    char    name[16];        /* 7 characters reach the cartridge */
+    /* What the select screen's plate shows. The cartridge picks that
+     * plate from a list of pre-rendered graphics by slot number, so past
+     * the ninth there is nothing to show; the host draws it instead, and
+     * can therefore fit a few more characters than the cartridge can. */
+    char    display_name[20];
+    uint8_t pitch_length;    /* yards; 0 leaves the cartridge's own */
+    uint8_t pitch_width;
+    bool has_profile;
+    IssdStadiumProfile profile;
+} IssdModStadium;
+
+typedef struct {
+    char        name[64];
+    char        author[64];
+    char        version[16];
+    char        description[128];
+    char        filepath[256];
+    bool        is_active;
+    /* Packs stack. This is the order they are applied in, so when two
+     * of them change the same team the higher number wins. Enabling a
+     * pack puts it last, which is what 'this one on top' means. */
+    int         apply_order;
+    /* A cartridge pack replaces the whole image. It names either
+     * `cartridge_image` (a complete 2 MB image beside the pack) or
+     * `cartridge_patch` (an IPS patch applied to the user's own verified
+     * retail ROM), never both - two sources would leave no honest answer
+     * which one to use. `cartridge_sha256` is optional and is the expected
+     * hash of the substituted image. Empty means absent.
+     *
+     * Parsing only records the names; issd_mod_cartridge_resolve decides
+     * which pack the enabled stack actually plays and nothing here reads a
+     * byte of the file. */
+    char        cartridge_image[64];
+    char        cartridge_patch[64];
+    char        cartridge_sha256[73];  /* 64 hex digits and their terminator */
+    int         team_count;
+    IssdModTeam teams[ISSD_MAX_TEAMS_PER_PACK];
+    int         stadium_count;      /* entries in `stadiums` below */
+    /* How many stadiums the game should offer at all. 0 leaves the
+     * cartridge's eight; more than that relocates and extends its
+     * tables. The highest value across the enabled packs wins. */
+    int         stadium_slots;
+    /* True when the pack wants the seventh group of teams offered. */
+    bool        unlock_bonus_teams;
+    IssdModStadium stadiums[ISSD_MAX_STADIUMS];
+} IssdModPack;
+
+/* What the last application of the enabled packs actually did.
+ *
+ * A mod that silently does nothing is the worst outcome, so the result is
+ * kept rather than only printed: the menu reports it, and a pack that
+ * failed to parse or named a team that does not exist says so on screen
+ * instead of only in a log nobody reads. */
+typedef struct {
+    int  packs_applied;
+    int  teams_patched;
+    int  players_patched;
+    int  formations_patched;
+    int  stadiums_patched;
+    int  tiles_loaded;      /* filled in by the host, not the roster patcher */
+    int  warnings;          /* applied, but something was ignored */
+    int  errors;            /* a pack could not be used at all */
+    char detail[96];        /* the first thing that went wrong */
+} IssdModResult;
+
+/* The plate text for a stadium slot, or NULL when no enabled pack names
+ * it. Later packs in the stack win, as everywhere else. */
+const char *issd_mod_stadium_plate_name(int slot);
+
+/* The plate text for a team, or NULL when no enabled pack renames it. */
+const char *issd_mod_team_plate_name(int team_id);
+
+/* How many teams the enabled packs add, and where each landed. Six is the
+ * ceiling: that is how many cells the seventh group has. */
+#define ISSD_MAX_ADDED_TEAMS 6
+int         issd_mod_added_team_count(void);
+
+/* The full path of the squad photograph a pack gives a team, resolved
+ * against the pack's own directory. False when no enabled pack has one. */
+bool        issd_mod_team_photo_path(int team_id, char *out, size_t cap);
+
+/* The full path of the custom flag graphic a pack gives a team, resolved
+ * against the pack's own directory. False when no enabled pack has one. */
+bool        issd_mod_team_flag_path(int team_id, char *out, size_t cap);
+
+/* What the enabled stack asks of the cartridge resolver. Boot and the
+ * in-process restart need to tell three cases apart, and the global
+ * IssdModResult counters cannot: those also carry unrelated pack and scan
+ * errors, so `errors != 0` never meant "the cartridge pack was refused".
+ *
+ * - NONE:     no enabled pack names a cartridge at all.
+ * - REFUSED:  a cartridge pack was named but cannot be used; `reason` says
+ *             why, and the retail cartridge plays.
+ * - WINNER:   one pack's cartridge is selected; the outputs name it.
+ *
+ * Shadowed cartridge packs are warnings, not refusals. They are reported in
+ * `notes` (and in IssdModResult, so the menu counts them) because the note
+ * lives in counters `issd_mod_reapply` resets: a caller that re-applies the
+ * stack must restate `notes` afterwards or the player never sees them. */
+#define ISSD_MOD_CARTRIDGE_NOTE_MAX  ISSD_MAX_MOD_PACKS
+#define ISSD_MOD_CARTRIDGE_NOTE_SIZE 160
+typedef enum {
+    ISSD_MOD_CARTRIDGE_NONE = 0,
+    ISSD_MOD_CARTRIDGE_REFUSED,
+    ISSD_MOD_CARTRIDGE_WINNER
+} IssdModCartridgeState;
+
+typedef struct {
+    IssdModCartridgeState state;
+    char reason[192];   /* why nothing can be played; REFUSED only */
+    char notes[ISSD_MOD_CARTRIDGE_NOTE_MAX][ISSD_MOD_CARTRIDGE_NOTE_SIZE];
+    int  note_count;    /* shadowed/other warnings, in stack order */
+} IssdModCartridgeStatus;
+
+/* The cartridge the enabled stack asks for. `status` is always written (it
+ * may be NULL for callers that only want the outputs) and is the authority on
+ * whether a pack was refused; do not infer that from the result counters.
+ * Returns true exactly when `status->state` is WINNER. Packs are walked in
+ * apply order and the topmost enabled cartridge pack wins; if it cannot be
+ * used the retail cartridge plays and the packs below it are NOT tried, which
+ * is what being on top means. Every cartridge pack it shadows is recorded in
+ * `status->notes` and counted as a warning, because the player enabled
+ * something that will not be played.
+ *
+ * A pack naming both an image and a patch cannot be used: one of the two
+ * would silently lose, so it is counted as an error, recorded as the
+ * REFUSED reason when no usable winner remains, and skipped by the resolver.
+ * A pack naming neither is not a cartridge pack at all.
+ *
+ * `pack_name_out` receives the winning pack's display name, `file_out` the
+ * image or patch joined to the pack's own directory (the same rule the team
+ * graphics use), `is_patch` whether that file is an IPS patch, and
+ * `sha256_out` its expected hash as written, or an empty string. Nothing is
+ * opened or read here; the caller loads the file. Any output may be NULL. */
+bool        issd_mod_cartridge_resolve(char *pack_name_out, size_t name_cap,
+                                       char *file_out, size_t file_cap,
+                                       bool *is_patch, char *sha256_out,
+                                       size_t sha_cap,
+                                       IssdModCartridgeStatus *status);
+
+/* The select screen's grid is not in team order: its first cell is
+ * England. These read the cartridge's own cell table, so anything drawn
+ * over that screen lands on the right team. -1 when it is not known. */
+/* What a slot is, in team order - "Italy", "All Star". NULL past the end. */
+const char *issd_mod_rom_team_name(int team);
+
+int         issd_mod_cell_team(int cell);
+int         issd_mod_team_cell(int team);
+
+/* True when any enabled pack asks for the seventh group. */
+bool        issd_mod_wants_bonus_teams(void);
+
+const IssdModResult *issd_mod_last_result(void);
+void issd_mod_result_reset(void);
+void issd_mod_result_note_tiles(int textures);
+
+/* One line, for the console and the on-screen notification, which is as
+ * wide as the game. */
+void issd_mod_result_summary(char *out, size_t cap);
+
+/* The same thing split to fit the menu box, which is 28 characters wide.
+ * `headline` says whether it worked; `detail` says what changed. */
+void issd_mod_result_lines(char *headline, size_t hcap,
+                           char *detail, size_t dcap);
+
+/* Lifecycle & Registry */
+bool        issd_mod_init(void);
+int         issd_mod_load_pack(const char *json_filepath);
+int         issd_mod_scan_and_load(const char *mods_directory);
+int         issd_mod_get_pack_count(void);
+IssdModPack* issd_mod_get_pack(int index);
+int         issd_mod_get_active_pack_index(void);
+
+/* Stacking. Packs are independent switches rather than one choice. */
+void        issd_mod_set_pack_enabled(int index, bool enabled);
+bool        issd_mod_is_pack_enabled(int index);
+int         issd_mod_enabled_count(void);
+
+/* The enabled packs as a '|' separated list of names, in apply order, and
+ * the reverse. This is what the config file stores, so the stack and its
+ * order survive a restart - which is when mods actually take effect. */
+void        issd_mod_enabled_list(char *out, size_t cap);
+void        issd_mod_enable_from_list(const char *list);
+
+/* Index of the pack applied `slot` places into the stack, -1 past the end. */
+int         issd_mod_pack_at_order(int slot);
+
+/* Used by the patcher to fold problems into the result the menu reports. */
+void        issd_mod_result_note_error(const char *detail);
+void        issd_mod_result_note_warning(const char *detail);
+IssdModResult *issd_mod_result_mutable(void);
+void        issd_mod_set_active_pack(int index);
+
+/* Lookup & Runtime Patching */
+const IssdModTeam* issd_mod_get_active_team(uint8_t team_id);
+bool        issd_mod_apply_to_game(uint8_t team_id);
+void        issd_mod_apply_match_overrides(uint8_t p1_team, uint8_t p2_team);
+
+/* Apply every active pack to the cartridge image. Rosters live in ROM, so
+ * this must run after the ROM is read and before the engine starts.
+ * Returns the number of players patched. */
+int         issd_mod_apply_to_rom(uint8_t *rom, size_t rom_size);
+
+/* Remember the cartridge image and keep a pristine copy, so packs can be
+ * switched at runtime. Call once, after the ROM is read. */
+void        issd_mod_rom_set_image(uint8_t *rom, size_t rom_size);
+
+/* Restore the pristine image and apply whichever pack is active. Rosters are
+ * read when a match loads, so a change takes effect from the next match. */
+int         issd_mod_reapply(void);
+/* Synchronize a runner-owned cartridge copy after an in-process reapply.
+ * Reject a missing image or size mismatch without changing the destination. */
+bool        issd_mod_copy_applied_rom(uint8_t *destination, size_t size);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* ISSD_MOD_H */

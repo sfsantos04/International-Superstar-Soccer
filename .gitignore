@@ -1,0 +1,98 @@
+# ROMs and cartridge dumps (Strict copyright rule)
+*.sfc
+*.smc
+*.bin
+*.rom
+*.bs
+*.st
+*.fig
+deps/ISSD-web-editor/rom/
+roms/
+firmware/
+
+# Build artifacts
+build/
+build-*/
+bin/
+dist/
+out/
+target/
+*.obj
+*.o
+*.lib
+*.a
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Visual Studio / IDE files
+.vs/
+*.vcxproj*
+*.sln
+.idea/
+.vscode/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local runtime logs and state
+*.log
+*.sav
+*.srm
+issd_native.cfg
+saves/
+*.wram
+*.ppu
+*.bmp
+
+# A high resolution tile pack is a directory of BMPs under mods/. Those are
+# content, not the screen captures the rule above is aimed at.
+!mods/**/*.bmp
+*.png
+
+# The editor's assets are cut out of screenshots but they are not
+# screenshots - the eight pitches and the four players it shows are the
+# only honest picture it has of what a setting does, and the exe will not
+# build without them.
+!tools/mod_studio/assets/**/*.png
+!android/app/src/main/res/**/*.png
+!android/*.png
+*.wav
+*.spc
+tier2_*.json
+tier2_*.jsonl
+_*.json
+_*.txt
+aot_deny_boot.txt
+
+# Local configuration and debug captures
+issd_config.local.json
+screenshots/
+captures/
+dumps/
+recomp/.generated.snesrecomp-staging-*/
+deps/**/.git-vendor/
+android/local.properties
+android/.gradle/
+android/app/build/
+deps/SDL2/
+android/app/.cxx/
+
+# The mod editor is built, not committed: 29 MB of bundled Python, and
+# `python tools/build_mod_studio.py` makes it in one command.
+tools/mod_studio/dist/
+tools/mod_studio/__pycache__/
+
+# Original authored stadium example resources (no cartridge pixels).
+!mods/independent_stadium_example/**/*.bin
+# Local execution ledgers and transient build logs.
+/.superpowers/

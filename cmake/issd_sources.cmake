@@ -1,0 +1,69 @@
+# Source list shared by every port.
+#
+# Kept in one place so the desktop and Android builds cannot drift apart: a new
+# file added here is picked up by Windows, Linux, SteamOS and Android at once.
+# ISSD_ROOT must be set by the caller.
+
+if(NOT DEFINED ISSD_ROOT)
+    message(FATAL_ERROR "issd_sources.cmake: set ISSD_ROOT before including")
+endif()
+
+file(GLOB ISSD_GENERATED_SOURCES CONFIGURE_DEPENDS
+    "${ISSD_ROOT}/recomp/generated/*.c"
+)
+if(NOT ISSD_GENERATED_SOURCES)
+    message(FATAL_ERROR
+        "No recompiled sources in ${ISSD_ROOT}/recomp/generated -- "
+        "the cartridge translation units are missing.")
+endif()
+
+set(ISSD_GAME_SOURCES
+    "${ISSD_ROOT}/ISSDNative/main.c"
+    "${ISSD_ROOT}/ISSDNative/issd_bridge.c"
+    "${ISSD_ROOT}/ISSDNative/issd_widescreen.c"
+    "${ISSD_ROOT}/ISSDNative/issd_pose_history.c"
+    "${ISSD_ROOT}/ISSDNative/issd_animation.c"
+    "${ISSD_ROOT}/ISSDNative/issd_running.c"
+    "${ISSD_ROOT}/ISSDNative/issd_team_visual.c"
+    "${ISSD_ROOT}/ISSDNative/issd_config.c"
+    "${ISSD_ROOT}/ISSDNative/issd_video.c"
+    "${ISSD_ROOT}/ISSDNative/issd_camera.c"
+    "${ISSD_ROOT}/ISSDNative/issd_camera_render.c"
+    "${ISSD_ROOT}/ISSDNative/issd_readability.c"
+    "${ISSD_ROOT}/ISSDNative/issd_gameplay.c"
+    "${ISSD_ROOT}/ISSDNative/issd_match_options.c"
+    "${ISSD_ROOT}/ISSDNative/issd_strength.c"
+    "${ISSD_ROOT}/ISSDNative/issd_launcher_model.c"
+    "${ISSD_ROOT}/ISSDNative/issd_launcher.c"
+    "${ISSD_ROOT}/ISSDNative/issd_bugfix_keeper.c"
+    "${ISSD_ROOT}/ISSDNative/issd_bugfix_skills.c"
+    "${ISSD_ROOT}/ISSDNative/issd_bugfix_goal.c"
+    "${ISSD_ROOT}/ISSDNative/issd_bugfix_name.c"
+    "${ISSD_ROOT}/ISSDNative/issd_match.c"
+    "${ISSD_ROOT}/ISSDNative/issd_match_menu.c"
+    "${ISSD_ROOT}/ISSDNative/issd_save.c"
+    "${ISSD_ROOT}/ISSDNative/issd_campaign.c"
+    "${ISSD_ROOT}/ISSDNative/issd_snapshot.c"
+    "${ISSD_ROOT}/ISSDNative/issd_password.c"
+    "${ISSD_ROOT}/ISSDNative/issd_password_ui.c"
+    "${ISSD_ROOT}/ISSDNative/issd_mod.c"
+    "${ISSD_ROOT}/ISSDNative/issd_cartridge.c"
+    "${ISSD_ROOT}/ISSDNative/issd_stadium.c"
+    "${ISSD_ROOT}/ISSDNative/issd_asset_path.c"
+    "${ISSD_ROOT}/ISSDNative/issd_stadium_assets.c"
+    "${ISSD_ROOT}/ISSDNative/issd_stadium_rom.c"
+    "${ISSD_ROOT}/ISSDNative/issd_stadium_scene.c"
+    "${ISSD_ROOT}/ISSDNative/issd_stadium_geometry.c"
+    "${ISSD_ROOT}/ISSDNative/issd_stadium_template.c"
+    "${ISSD_ROOT}/ISSDNative/issd_mod_rom.c"
+    "${ISSD_ROOT}/ISSDNative/issd_formation.c"
+    "${ISSD_ROOT}/ISSDNative/issd_hd.c"
+    "${ISSD_ROOT}/ISSDNative/issd_menu.c"
+    "${ISSD_ROOT}/ISSDNative/issd_controls.c"
+    "${ISSD_ROOT}/ISSDNative/issd_decompress.c"
+    "${ISSD_ROOT}/ISSDNative/issd_audio.c"
+    "${ISSD_ROOT}/ISSDNative/issd_touch.c"
+    "${ISSD_ROOT}/ISSDNative/issd_input.c"
+    "${ISSD_ROOT}/ISSDNative/issd_script.c"
+    "${ISSD_ROOT}/ISSDNative/issd_android.c"
+)

@@ -1,0 +1,85 @@
+#ifndef ISSD_SAVE_H
+#define ISSD_SAVE_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>   /* size_t: MSVC pulls this in transitively, glibc does not */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define ISSD_MAX_SAVE_SLOTS 8
+
+typedef struct {
+    uint32_t magic;         /* 0x44535349 'ISSD' */
+    uint32_t version;       /* Save format version */
+    uint64_t timestamp;     /* Unix timestamp */
+    uint32_t frame_counter; /* In-game total frames */
+    
+    /* Game State Mirrors */
+    uint8_t  game_mode1;
+    uint8_t  game_mode2;
+    uint8_t  p1_team;
+    uint8_t  p2_team;
+    uint8_t  p1_score;
+    uint8_t  p2_score;
+    uint16_t match_seconds_remaining;
+
+    /* Tournament & Scenario Metadata */
+    uint8_t  tournament_stage;
+    uint8_t  difficulty;
+    char     slot_label[32];
+
+    /* Full SNES WRAM snapshot (128 KB) */
+    uint8_t  wram[0x20000];
+
+    /* PPU snapshot region. WRAM alone describes the simulation but not the
+     * picture: palettes, sprites and tiles are streamed by the game as it
+     * walks its menus, so a slot restored at boot would render garbage
+     * without them. Mirrors the snapshot block delimited in snes/ppu.h. */
+    uint16_t cgram[0x100];
+    uint16_t oam[0x100];
+    uint8_t  high_oam[0x20];
+    uint16_t vram[0x8000];
+} IssdSaveSlot;
+
+typedef bool (*IssdSnapshotSaveFn)(const char *path);
+typedef bool (*IssdSnapshotLoadFn)(const char *path);
+void issd_save_set_snapshot_backends(IssdSnapshotSaveFn save_fn, IssdSnapshotLoadFn load_fn);
+/* Pure validation of a raw snapshot payload; must not mutate guest/host state. */
+void issd_save_set_snapshot_validator(bool (*validator)(const void *, size_t));
+/* Call after a successful restore, once guest state has been reconciled. */
+void issd_save_set_load_callback(void (*callback)(void));
+bool issd_save_set_directory(const char *directory);
+void issd_save_set_context(const uint8_t *base, size_t base_size,
+                           const uint8_t *effective, size_t effective_size,
+                           uint32_t gameplay_flags);
+/* NULL preserves the existing context algorithm. A non-NULL digest extends
+ * it with normalized stadium gameplay identity, excluding cosmetic assets. */
+void issd_save_set_context_extra(const uint8_t *digest32);
+bool issd_save_campaign(const char *label);
+bool issd_save_continue(void);
+bool issd_save_continue_info(char *out_info, size_t max_len);
+/* Cached full runtime setup, independent of campaign and numbered slots.
+ * All favorite operations require an applied context and pure validator.
+ * Successful read returns malloc-owned raw payload; failures reset outputs. */
+bool issd_save_match_favorite(const void *data, size_t size, const char *label);
+bool issd_save_read_match_favorite(void **data, size_t *size);
+bool issd_save_match_favorite_info(char *out_info, size_t max_len);
+const char *issd_save_error(void);
+bool issd_save_is_legacy(int slot_index);
+bool issd_load_from_slot_confirmed(int slot_index, bool allow_legacy);
+
+bool issd_save_init(void);
+bool issd_save_to_slot(int slot_index, const char *label);
+bool issd_load_from_slot(int slot_index);
+bool issd_save_quick(void);
+bool issd_load_quick(void);
+bool issd_save_get_info(int slot_index, char *out_info, size_t max_len);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* ISSD_SAVE_H */

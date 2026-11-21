@@ -1,0 +1,118 @@
+#ifndef ISSD_HD_H
+#define ISSD_HD_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* High resolution replacements for the cartridge's background tiles.
+ *
+ * The emulated PPU draws at 256x224 and the result is scaled up for the
+ * window, so a replacement cannot simply be handed to the renderer. Instead
+ * the background tilemaps are walked a second time after the frame is drawn,
+ * and wherever a tile has a replacement its pixels are written into the
+ * already-scaled buffer.
+ *
+ * A tile is identified by its own graphics data together with the colours it
+ * is drawn in, so the same artwork in two palettes is two textures. Nothing
+ * about the cartridge is modified: a pack is purely a set of images.
+ */
+
+typedef struct Ppu Ppu;
+
+/* Point the loader at a directory of replacement tiles and load what is
+ * there. NULL or an empty string turns replacement off. Safe to call again
+ * to switch packs. Returns the number of textures loaded. */
+int  issd_hd_load_pack(const char *directory);
+
+/* Packs stack. Later ones win a tile the earlier ones also replace, so a
+ * small pack can sit on top of a big one and override a few tiles. */
+void issd_hd_clear(void);
+/* Local artwork takes precedence only in the matching stadium generation.
+ * Loading is atomic; global packs and other stadiums remain independent. */
+bool issd_hd_load_stadium(int id, unsigned generation, const uint64_t *keys,
+                         const char *const *files, size_t count);
+void issd_hd_clear_stadiums(void);
+void issd_hd_set_stadium_context(int id, unsigned generation);
+int  issd_hd_add_pack(const char *directory);
+
+/* Which of the available packs are switched on, and in what order. The
+ * enabled set is a '|' separated list of directory names - the same shape
+ * the roster packs use, and what the config file stores. */
+void issd_hd_set_enabled(int index, bool enabled);
+bool issd_hd_is_enabled(int index);
+int  issd_hd_enabled_count(void);
+void issd_hd_enabled_list(char *out, size_t cap);
+void issd_hd_enable_from_list(const char *list);
+
+/* Load every enabled pack, in order, replacing whatever is loaded now.
+ * Returns the number of tiles available afterwards. */
+int  issd_hd_apply(const char *mods_dir);
+
+/* True once a pack with at least one texture is loaded. */
+bool issd_hd_active(void);
+int  issd_hd_texture_count(void);
+
+/* Find the pack directories under `mods_dir`: a subdirectory holding at
+ * least one .bmp is a pack. Returns how many were found, so the menu can
+ * offer them without the player typing a path. */
+int         issd_hd_scan_packs(const char *mods_dir);
+int         issd_hd_available_count(void);
+const char *issd_hd_available_name(int index);
+
+/* Name of the loaded pack directory, or "" when none is loaded. */
+const char *issd_hd_pack_name(void);
+
+/* Write every background tile the game draws into `directory` as an 8x8
+ * 32-bit BMP named after its identity, so a pack can be authored from the
+ * real thing. NULL stops dumping. */
+void issd_hd_set_dump_dir(const char *directory);
+
+/* Ignore everything before this frame when dumping, so a run that walks
+ * through several screens can yield a pack for just the last one. */
+void issd_hd_set_dump_start(unsigned frame);
+
+/* Record the registers, VRAM and palette a scanline will be drawn with.
+ * The later compositor uses these snapshots after presentation edits restore
+ * emulated memory. Call once per line,
+ * after that line's HDMA has been applied and before the line is rendered;
+ * `line` is the PPU's line counter, which draws screen row line - 1. The
+ * title screen changes background mode partway down the frame, so the state
+ * at the end of the frame does not describe the top of it. */
+void issd_hd_begin_frame(void);
+void issd_hd_note_line(const Ppu *ppu, int line);
+/* Immediately after ppu_runLine, capture main-screen pixel ownership from
+ * the new renderer. Same-colour sprites/upper layers must not receive BG art. */
+void issd_hd_note_rendered_line(const Ppu *ppu, int line);
+/* Read-only lookup for a directly sampled tactical world tile. Returned
+ * storage belongs to the active pack and expires when packs change. */
+const uint32_t *issd_hd_camera_texture(const Ppu *ppu,unsigned base,unsigned character,
+                                      unsigned palette,int *size);
+
+/* Composite replacements into an already-scaled frame.
+ *
+ * `native` is the frame as the PPU drew it, `native_w` x `native_h`, with
+ * `margin_left` widescreen columns before the authentic 256. `hi` is that
+ * frame scaled up by `scale`. Only pixels that still show the tile the
+ * tilemap says is there are replaced, so sprites and layers drawn on top of
+ * a background survive untouched. */
+void issd_hd_composite(const Ppu *ppu,
+                       const uint32_t *native, int native_w, int native_h,
+                       uint32_t *hi, int scale, int margin_left);
+
+/* Walk the frame's tilemaps for dumping only, without drawing anything.
+ * A dump must not need a pack to already exist. */
+void issd_hd_dump_frame(const Ppu *ppu);
+
+/* Tiles replaced in the last composited frame, for the status line. */
+int issd_hd_last_frame_hits(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* ISSD_HD_H */

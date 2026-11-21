@@ -1,0 +1,59 @@
+name: ios
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ipa:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ambiente
+        run: |
+          xcodebuild -version
+          cmake --version
+          sysctl -n hw.ncpu
+          df -h /
+
+      - name: Build + empacotar
+        run: |
+          chmod +x ios/build_ios.sh
+          ./ios/build_ios.sh "$PWD" 2>&1 | tee build-ios.log
+
+      - name: Verificar o IPA
+        if: success()
+        run: |
+          ls -lh build-ios/ISSDNative.ipa
+          shasum -a 256 build-ios/ISSDNative.ipa | tee ISSDNative.ipa.sha256
+          unzip -l build-ios/ISSDNative.ipa | head -30
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
+            "$(unzip -Z1 build-ios/ISSDNative.ipa | head -1)" 2>/dev/null || true
+
+      - name: Publicar release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: ISSD Native iOS build ${{ github.run_number }}
+          files: |
+            build-ios/ISSDNative.ipa
+            ISSDNative.ipa.sha256
+          prerelease: true
+
+      - name: Log da falha
+        if: failure()
+        run: |
+          cp build-ios.log /tmp/build-ios.log 2>/dev/null || true
+          tail -200 /tmp/build-ios.log > log-${{ github.run_number }}.txt 2>/dev/null || echo "sem log" > log-${{ github.run_number }}.txt
+
+      - name: Publicar log da falha
+        if: failure()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: log-${{ github.run_number }}
+          name: falha ${{ github.run_number }}
+          files: log-${{ github.run_number }}.txt
+          prerelease: true
